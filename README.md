@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/kkddytd/claude-api?style=social)](https://github.com/kkddytd/claude-api)
 
-**AWS Kiro 账号池管理系统** - 将 Amazon Q Developer (Kiro) API 转换为 OpenAI 兼容格式的企业级 Go 代理服务。支持多账号池管理、OIDC 自动认证、令牌自动刷新、流式响应、完整的 Web 管理控制台。
+**AWS Kiro 账号池管理系统** - 将 Amazon Q Developer (Kiro) API 转换为 OpenAI 兼容格式的企业级 Go 代理服务。支持多账号池管理、OIDC 自动认证、令牌自动刷新、流式响应、完整的 Web 管理控制台 自动注册Kiro账号 使用自己的邮箱信息。
 
 **关键词**: AWS Kiro, Amazon Q Developer, Claude API, OpenAI Proxy, 账号池管理, OIDC 认证, Go 代理服务, 多账号管理, API 转换, 企业级代理
 
