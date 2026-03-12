@@ -628,37 +628,6 @@ claude-api/
 - **前端**: Vue.js 3
 - **Token 计数**: anthropic-tokenizer-go
 
-### 项目结构
-
-```
-claude-api/
-├── main.go                      # 程序入口
-├── build.sh                     # 构建脚本
-├── config.yaml                  # 配置文件
-├── internal/                    # 内部包
-│   ├── api/                    # API 服务器
-│   │   ├── server.go           # 服务器核心
-│   │   ├── routes.go           # 路由配置
-│   │   └── handlers.go         # 请求处理器
-│   ├── amazonq/                # Amazon Q 客户端
-│   ├── auth/                   # 认证模块
-│   ├── claude/                 # 格式转换
-│   ├── stream/                 # 流处理
-│   ├── database/               # 数据库
-│   ├── models/                 # 数据模型
-│   ├── config/                 # 配置管理
-│   ├── logger/                 # 日志系统
-│   ├── tokenizer/              # Token 计数
-│   └── sync/                   # 同步客户端
-├── frontend/                    # Web 前端
-│   ├── index.html
-│   ├── js/
-│   └── css/
-│   ├── server.py
-│   └── requirements.txt
-└── dist/                        # 编译产物
-```
-
 ### 数据流
 
 ```
