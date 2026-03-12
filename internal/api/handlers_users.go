@@ -81,6 +81,7 @@ func (s *Server) handleCreateUser(c *gin.Context) {
 		TotalTokensUsed: 0,
 		TotalRequests:   0,
 		TotalCostUSD:    0,
+		ExpiresAt:       req.ExpiresAt,
 		Notes:           req.Notes,
 	}
 
@@ -347,6 +348,101 @@ func (s *Server) handleGetUserIPs(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"ips":   ips,
 		"count": len(ips),
+	})
+}
+
+// handleCreateTempUser 创建临时用户（带过期时间）
+// @author ygw
+func (s *Server) handleCreateTempUser(c *gin.Context) {
+	logger.Info("创建临时用户 - 请求来源: %s", c.ClientIP())
+
+	var req struct {
+		Name         string  `json:"name" binding:"required"`
+		Email        *string `json:"email"`
+		DailyQuota   *int    `json:"daily_quota"`
+		MonthlyQuota *int    `json:"monthly_quota"`
+		RequestQuota *int    `json:"request_quota"`
+		RateLimitRPM *int    `json:"rate_limit_rpm"`
+		IsVip        *bool   `json:"is_vip"`
+		ExpiryDays   int     `json:"expiry_days" binding:"required,min=1,max=365"` // 过期天数（1-365天）
+		Notes        *string `json:"notes"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Warn("创建临时用户失败 - 请求格式错误: %v", err)
+		c.JSON(400, gin.H{"error": "请求格式错误: " + err.Error()})
+		return
+	}
+
+	// 生成 API key
+	apiKey, err := auth.GenerateAPIKey()
+	if err != nil {
+		logger.Error("生成 API key 失败: %v", err)
+		c.JSON(500, gin.H{"error": "生成 API key 失败"})
+		return
+	}
+
+	// 设置默认值
+	dailyQuota := 0
+	if req.DailyQuota != nil {
+		dailyQuota = *req.DailyQuota
+	}
+
+	monthlyQuota := 0
+	if req.MonthlyQuota != nil {
+		monthlyQuota = *req.MonthlyQuota
+	}
+
+	requestQuota := 0
+	if req.RequestQuota != nil {
+		requestQuota = *req.RequestQuota
+	}
+
+	rateLimitRPM := 0
+	if req.RateLimitRPM != nil {
+		rateLimitRPM = *req.RateLimitRPM
+	}
+
+	isVip := false
+	if req.IsVip != nil {
+		isVip = *req.IsVip
+	}
+
+	// 计算过期时间
+	expiresAt := time.Now().Add(time.Duration(req.ExpiryDays) * 24 * time.Hour).Unix()
+
+	// 创建临时用户对象
+	user := &models.User{
+		ID:              uuid.New().String(),
+		Name:            req.Name,
+		Email:           req.Email,
+		APIKey:          apiKey,
+		CreatedAt:       time.Now().Format(time.RFC3339),
+		UpdatedAt:       time.Now().Format(time.RFC3339),
+		Enabled:         true,
+		IsVip:           isVip,
+		DailyQuota:      dailyQuota,
+		MonthlyQuota:    monthlyQuota,
+		RequestQuota:    requestQuota,
+		RateLimitRPM:    rateLimitRPM,
+		TotalTokensUsed: 0,
+		TotalRequests:   0,
+		TotalCostUSD:    0,
+		ExpiresAt:       &expiresAt,
+		Notes:           req.Notes,
+	}
+
+	// 保存到数据库
+	if err := s.db.CreateUser(c.Request.Context(), user); err != nil {
+		logger.Error("创建临时用户失败: %v", err)
+		c.JSON(500, gin.H{"error": "创建临时用户失败"})
+		return
+	}
+
+	logger.Info("临时用户已创建: %s (%s) - 过期时间: %s", user.Name, user.ID, time.Unix(expiresAt, 0).Format("2006-01-02 15:04:05"))
+	c.JSON(200, gin.H{
+		"user":       user,
+		"expires_at": time.Unix(expiresAt, 0).Format(time.RFC3339),
 	})
 }
 
