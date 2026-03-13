@@ -174,6 +174,7 @@ func (s *Server) setupConsoleRoutes(r *gin.Engine) {
 	{
 		logsGroup.GET("", s.handleGetLogs)
 		logsGroup.GET("/stats", s.handleGetStats)
+		logsGroup.GET("/user-stats", s.handleGetUserUsageStats)
 		logsGroup.POST("/cleanup", s.requireTestModePassword, s.handleCleanupLogs) // 测试模式需要密码
 	}
 
@@ -198,6 +199,7 @@ func (s *Server) setupConsoleRoutes(r *gin.Engine) {
 	usersGroup.Use(s.requireAdmin)
 	{
 		usersGroup.POST("", s.requireTestModePassword, s.handleCreateUser)                    // 测试模式需要密码
+		usersGroup.POST("/temp", s.requireTestModePassword, s.handleCreateTempUser)           // 创建临时用户 @author ygw
 		usersGroup.POST("/batch-vip", s.requireTestModePassword, s.handleBatchCreateVIPUsers) // 批量创建VIP用户 @author ygw
 		usersGroup.GET("", s.handleListUsers)
 		usersGroup.GET("/:id", s.handleGetUser)

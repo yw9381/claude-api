@@ -38,7 +38,7 @@
 ## ✨ 核心特性
 
 ### 🏊 AWS Kiro 账号池管理
-- **多账号池**: 支持最多 100 个 AWS Kiro (Amazon Q Developer) 账号统一管理
+- **无限账号池**: 支持无限制数量的 AWS Kiro (Amazon Q Developer) 账号统一管理
 - **OIDC 自动认证**: 完整的 AWS OIDC 设备授权流程，无需手动获取令牌
 - **智能负载均衡**: 自动选择可用账号，均衡分配请求负载
 - **令牌自动刷新**: 后台自动检测并刷新过期的 AWS 令牌，保持账号池持续可用
@@ -63,7 +63,16 @@
 - **账号池监控**: 实时查看所有 AWS Kiro 账号状态、令牌有效期、使用统计
 - **在线测试**: 内置聊天测试界面，支持流式对话
 - **请求日志**: 完整的 API 请求日志、统计图表、错误追踪
-- **批量操作**: 批量添加、删除、刷新 Kiro 账号
+- **用户管理** ⭐ NEW:
+  - 支持创建和管理多个用户
+  - 每个用户独立的 API Key
+  - 用户级别的配额管理（每日/每月 Token 限制）
+  - 请求频率限制（RPM）
+  - 临时用户支持（可设置过期时间）
+  - 用户使用统计（请求次数、Token 消耗、费用）
+- **用户筛选** ⭐ NEW: 支持按用户筛选日志，快速定位特定用户的请求记录
+- **长期日志保留** ⭐ NEW: 默认保留30天日志（原7天），支持更长时间范围查询
+- **批量操作**: 批量添加、删除、刷新 Kiro 账号，批量创建 VIP 用户
 - **系统设置**: 可视化配置 API Key、限流规则、日志保留策略
 
 ## 🚀 快速开始
@@ -618,37 +627,6 @@ claude-api/
 - **数据库**: SQLite (glebarez/sqlite - 纯 Go，无需 CGO) / MySQL
 - **前端**: Vue.js 3
 - **Token 计数**: anthropic-tokenizer-go
-
-### 项目结构
-
-```
-claude-api/
-├── main.go                      # 程序入口
-├── build.sh                     # 构建脚本
-├── config.yaml                  # 配置文件
-├── internal/                    # 内部包
-│   ├── api/                    # API 服务器
-│   │   ├── server.go           # 服务器核心
-│   │   ├── routes.go           # 路由配置
-│   │   └── handlers.go         # 请求处理器
-│   ├── amazonq/                # Amazon Q 客户端
-│   ├── auth/                   # 认证模块
-│   ├── claude/                 # 格式转换
-│   ├── stream/                 # 流处理
-│   ├── database/               # 数据库
-│   ├── models/                 # 数据模型
-│   ├── config/                 # 配置管理
-│   ├── logger/                 # 日志系统
-│   ├── tokenizer/              # Token 计数
-│   └── sync/                   # 同步客户端
-├── frontend/                    # Web 前端
-│   ├── index.html
-│   ├── js/
-│   └── css/
-│   ├── server.py
-│   └── requirements.txt
-└── dist/                        # 编译产物
-```
 
 ### 数据流
 

@@ -64,6 +64,9 @@ func applyLogFiltersGorm(query *gorm.DB, filters *models.LogFilters) *gorm.DB {
 	if filters.AccountID != nil {
 		query = query.Where("account_id = ?", *filters.AccountID)
 	}
+	if filters.UserID != nil {
+		query = query.Where("user_id = ?", *filters.UserID)
+	}
 	if filters.EndpointType != nil {
 		query = query.Where("endpoint_type = ?", *filters.EndpointType)
 	}
@@ -154,6 +157,91 @@ func (db *DB) GetRequestStatsWithFilters(ctx context.Context, filters *models.Lo
 	stats.TopAccounts = topAccounts
 
 	return stats, nil
+}
+
+// GetUserUsageStats 获取用户使用统计（按用户分组）
+func (db *DB) GetUserUsageStats(ctx context.Context, filters *models.LogFilters) ([]*models.UserStat, error) {
+	type UserStatRaw struct {
+		UserID            *string
+		RequestCount      int64
+		SuccessCount      int64
+		FailedCount       int64
+		TotalInputTokens  int64
+		TotalOutputTokens int64
+		AvgDurationMs     float64
+		LastRequestTime   string
+	}
+
+	var rawStats []UserStatRaw
+	query := db.gorm.WithContext(ctx).Model(&models.RequestLog{}).
+		Select(`user_id,
+			COUNT(*) as request_count,
+			COALESCE(SUM(CASE WHEN is_success = true THEN 1 ELSE 0 END), 0) as success_count,
+			COALESCE(SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END), 0) as failed_count,
+			COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+			COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+			COALESCE(AVG(duration_ms), 0) as avg_duration_ms,
+			MAX(timestamp) as last_request_time`).
+		Where("user_id IS NOT NULL AND user_id != ''")
+
+	query = applyLogFiltersGorm(query, filters)
+	query = query.Group("user_id").Order("request_count DESC")
+
+	if err := query.Scan(&rawStats).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取所有用户信息
+	userIDs := make([]string, 0, len(rawStats))
+	for _, stat := range rawStats {
+		if stat.UserID != nil && *stat.UserID != "" {
+			userIDs = append(userIDs, *stat.UserID)
+		}
+	}
+
+	userMap := make(map[string]*models.User)
+	if len(userIDs) > 0 {
+		users, _ := db.GetUsersByIDs(ctx, userIDs)
+		for _, u := range users {
+			userMap[u.ID] = u
+		}
+	}
+
+	// 组装结果
+	result := make([]*models.UserStat, 0, len(rawStats))
+	for _, stat := range rawStats {
+		if stat.UserID == nil || *stat.UserID == "" {
+			continue
+		}
+
+		userStat := &models.UserStat{
+			UserID:            *stat.UserID,
+			UserName:          "未知用户",
+			IsVip:             false,
+			RequestCount:      stat.RequestCount,
+			SuccessCount:      stat.SuccessCount,
+			FailedCount:       stat.FailedCount,
+			TotalInputTokens:  stat.TotalInputTokens,
+			TotalOutputTokens: stat.TotalOutputTokens,
+			TotalTokens:       stat.TotalInputTokens + stat.TotalOutputTokens,
+			AvgDurationMs:     stat.AvgDurationMs,
+			LastRequestTime:   stat.LastRequestTime,
+		}
+
+		// 计算成本
+		_, _, cost := models.CalculateTokenCost(stat.TotalInputTokens, stat.TotalOutputTokens)
+		userStat.TotalCostUSD = cost
+
+		// 填充用户信息
+		if user, ok := userMap[*stat.UserID]; ok {
+			userStat.UserName = user.Name
+			userStat.IsVip = user.IsVip
+		}
+
+		result = append(result, userStat)
+	}
+
+	return result, nil
 }
 
 // CheckIPRateLimit 检查IP频率限制

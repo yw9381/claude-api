@@ -826,6 +826,14 @@ func (s *Server) requireAccount(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		// 检查用户是否过期 @author ygw
+		if user.ExpiresAt != nil && time.Now().Unix() > *user.ExpiresAt {
+			logger.Warn("用户已过期 - 用户: %s (%s) - 过期时间: %s - 来源: %s",
+				user.Name, user.ID, time.Unix(*user.ExpiresAt, 0).Format("2006-01-02 15:04:05"), c.ClientIP())
+			c.JSON(401, gin.H{"error": "用户已过期"})
+			c.Abort()
+			return
+		}
 		// 每日请求限制检查：指定IP每日限制 > 用户每日请求限制 @author ygw
 		ipDailyAllowed, ipDailyReason := s.checkDailyRequestLimit(c.Request.Context(), c.ClientIP(), user)
 		if !ipDailyAllowed {

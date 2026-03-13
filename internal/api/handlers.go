@@ -1939,6 +1939,15 @@ func (s *Server) handleClaudeMessages(c *gin.Context) {
 					return
 				}
 
+				// 检查用户是否过期 @author ygw
+				if user.ExpiresAt != nil && time.Now().Unix() > *user.ExpiresAt {
+					logger.Warn("Claude Messages API key 验证失败 - 用户已过期 - 用户: %s (%s) - 过期时间: %s - 来源: %s",
+						user.Name, user.ID, time.Unix(*user.ExpiresAt, 0).Format("2006-01-02 15:04:05"), clientIP)
+					c.Set("error_message", "用户已过期")
+					c.JSON(401, gin.H{"error": "用户已过期"})
+					return
+				}
+
 				// 每日请求限制检查：指定IP每日限制 > 用户每日请求限制 @author ygw
 				ipDailyAllowed, ipDailyReason := s.checkDailyRequestLimit(c.Request.Context(), clientIP, user)
 				if !ipDailyAllowed {
@@ -3311,6 +3320,9 @@ func (s *Server) handleGetLogs(c *gin.Context) {
 	if accountID := c.Query("account_id"); accountID != "" {
 		filters.AccountID = &accountID
 	}
+	if userID := c.Query("user_id"); userID != "" {
+		filters.UserID = &userID
+	}
 	if endpointType := c.Query("endpoint_type"); endpointType != "" {
 		filters.EndpointType = &endpointType
 	}
@@ -3436,6 +3448,11 @@ func (s *Server) handleGetStats(c *gin.Context) {
 		filters.AccountID = &accountID
 	}
 
+	// 用户ID筛选
+	if userID := c.Query("user_id"); userID != "" {
+		filters.UserID = &userID
+	}
+
 	// 端点类型筛选
 	if endpointType := c.Query("endpoint_type"); endpointType != "" {
 		filters.EndpointType = &endpointType
@@ -3458,6 +3475,63 @@ func (s *Server) handleGetStats(c *gin.Context) {
 	stats.InputCostUSD, stats.OutputCostUSD, stats.TotalCostUSD = models.CalculateTokenCost(stats.TotalInputTokens, stats.TotalOutputTokens)
 
 	c.JSON(200, stats)
+}
+
+// handleGetUserUsageStats 获取用户使用统计（按用户分组）
+func (s *Server) handleGetUserUsageStats(c *gin.Context) {
+	logger.Debug("获取用户使用统计 - 来源: %s", c.ClientIP())
+
+	// 构建筛选条件
+	filters := &models.LogFilters{}
+
+	// 时间范围
+	if startTime := c.Query("start_time"); startTime != "" {
+		if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+			formatted := t.Local().Format(models.TimeFormat)
+			filters.StartTime = &formatted
+		} else {
+			filters.StartTime = &startTime
+		}
+	} else {
+		defaultStart := time.Now().Add(-30 * 24 * time.Hour).Format(models.TimeFormat)
+		filters.StartTime = &defaultStart
+	}
+
+	if endTime := c.Query("end_time"); endTime != "" {
+		if t, err := time.Parse(time.RFC3339, endTime); err == nil {
+			formatted := t.Local().Format(models.TimeFormat)
+			filters.EndTime = &formatted
+		} else {
+			filters.EndTime = &endTime
+		}
+	} else {
+		defaultEnd := models.CurrentTime()
+		filters.EndTime = &defaultEnd
+	}
+
+	// 其他筛选条件
+	if clientIP := c.Query("client_ip"); clientIP != "" {
+		filters.ClientIP = &clientIP
+	}
+	if accountID := c.Query("account_id"); accountID != "" {
+		filters.AccountID = &accountID
+	}
+	if endpointType := c.Query("endpoint_type"); endpointType != "" {
+		filters.EndpointType = &endpointType
+	}
+	if isSuccessStr := c.Query("is_success"); isSuccessStr != "" {
+		isSuccess := isSuccessStr == "true" || isSuccessStr == "1"
+		filters.IsSuccess = &isSuccess
+	}
+
+	userStats, err := s.db.GetUserUsageStats(c.Request.Context(), filters)
+	if err != nil {
+		logger.Error("获取用户统计失败: %v", err)
+		c.JSON(500, gin.H{"error": "获取用户统计失败"})
+		return
+	}
+
+	c.JSON(200, gin.H{"user_stats": userStats})
 }
 
 // handleCleanupLogs 清理旧日志

@@ -29,6 +29,7 @@ export const usersMixin = {
                 rateLimitRPM: 0,
                 enabled: true,
                 isVip: false,
+                expiresAt: '',
                 notes: ''
             },
             editUserForm: {},
@@ -163,10 +164,34 @@ export const usersMixin = {
                 rateLimitRPM: 0,
                 enabled: true,
                 isVip: false,
+                expiresAt: '',
                 notes: ''
             };
             this.newAPIKey = null;
             this.showCreateUserModal = true;
+        },
+
+        /**
+         * 设置过期时间（快捷按钮）
+         * @param {number} days - 天数
+         */
+        setExpiresAt(days) {
+            const now = new Date();
+            now.setDate(now.getDate() + days);
+            // 格式化为 datetime-local 需要的格式: YYYY-MM-DDTHH:mm
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            this.createUserForm.expiresAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+        },
+
+        /**
+         * 清除过期时间
+         */
+        clearExpiresAt() {
+            this.createUserForm.expiresAt = '';
         },
 
         /**
@@ -218,6 +243,14 @@ export const usersMixin = {
                 is_vip: this.createUserForm.isVip || false,
                 notes: this.createUserForm.notes || null
             };
+
+            // 处理过期日期（转换为Unix时间戳，使用中国时区）
+            if (this.createUserForm.expiresAt) {
+                // 将本地日期时间转换为Unix时间戳
+                const expiresDate = new Date(this.createUserForm.expiresAt);
+                formData.expires_at = Math.floor(expiresDate.getTime() / 1000);
+            }
+
             this.closeCreateUserModal(); // 先关闭创建弹窗
 
             // 测试模式需要密码
@@ -432,6 +465,53 @@ export const usersMixin = {
             this.userIPs = [];
         },
 
+        /**
+         * 格式化过期时间
+         * @param {number} expiresAt - Unix时间戳
+         * @returns {string} 格式化后的时间
+         */
+        formatExpiresAt(expiresAt) {
+            if (!expiresAt) return '永不过期';
+            const date = new Date(expiresAt * 1000);
+            const now = new Date();
+
+            // 计算剩余天数
+            const diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) {
+                return '已过期';
+            } else if (diffDays === 0) {
+                return '今天过期';
+            } else if (diffDays <= 7) {
+                return `${diffDays}天后过期`;
+            } else {
+                return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            }
+        },
+
+        /**
+         * 检查用户是否已过期
+         * @param {object} user - 用户对象
+         * @returns {boolean} 是否已过期
+         */
+        isUserExpired(user) {
+            if (!user.expires_at) return false;
+            return user.expires_at * 1000 < Date.now();
+        },
+
+        /**
+         * 检查用户是否即将过期（7天内）
+         * @param {object} user - 用户对象
+         * @returns {boolean} 是否即将过期
+         */
+        isUserExpiringSoon(user) {
+            if (!user.expires_at) return false;
+            const expiresDate = new Date(user.expires_at * 1000);
+            const now = new Date();
+            const diffDays = Math.ceil((expiresDate - now) / (1000 * 60 * 60 * 24));
+            return diffDays > 0 && diffDays <= 7;
+        },
+
         closeCreateUserModal() {
             this.showCreateUserModal = false;
             this.newAPIKey = null;
@@ -501,6 +581,25 @@ export const usersMixin = {
             if (!dateStr) return '-';
             try {
                 return new Date(dateStr).toLocaleDateString('zh-CN');
+            } catch {
+                return dateStr;
+            }
+        },
+
+        /**
+         * 格式化创建时间（更详细）
+         */
+        formatCreatedTime(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
             } catch {
                 return dateStr;
             }

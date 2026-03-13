@@ -20,6 +20,7 @@ type User struct {
 	TotalCostUSD     float64 `gorm:"column:total_cost_usd;default:0" json:"total_cost_usd"`       // 总消费金额（美元）@author ygw
 	LastResetDaily   *string `gorm:"column:last_reset_daily;size:50" json:"last_reset_daily,omitempty"`
 	LastResetMonthly *string `gorm:"column:last_reset_monthly;size:50" json:"last_reset_monthly,omitempty"`
+	ExpiresAt        *int64  `gorm:"column:expires_at;index" json:"expires_at,omitempty"`         // 过期时间（Unix时间戳），nil表示永不过期
 	Notes            *string `gorm:"type:text" json:"notes,omitempty"`
 }
 
@@ -35,10 +36,11 @@ type UserCreate struct {
 	Email        *string `json:"email"`
 	DailyQuota   *int    `json:"daily_quota"`
 	MonthlyQuota *int    `json:"monthly_quota"`
-	RequestQuota *int    `json:"request_quota"` // 每日请求次数限制 @author ygw
+	RequestQuota *int    `json:"request_quota"`  // 每日请求次数限制 @author ygw
 	RateLimitRPM *int    `json:"rate_limit_rpm"` // 每分钟请求频率限制 @author ygw
 	Enabled      *bool   `json:"enabled"`
-	IsVip        *bool   `json:"is_vip"` // VIP用户标识 @author ygw
+	IsVip        *bool   `json:"is_vip"`   // VIP用户标识 @author ygw
+	ExpiresAt    *int64  `json:"expires_at"` // 过期时间（Unix时间戳）
 	Notes        *string `json:"notes"`
 }
 
@@ -49,10 +51,11 @@ type UserUpdate struct {
 	Email        *string `json:"email"`
 	DailyQuota   *int    `json:"daily_quota"`
 	MonthlyQuota *int    `json:"monthly_quota"`
-	RequestQuota *int    `json:"request_quota"` // 每日请求次数限制 @author ygw
+	RequestQuota *int    `json:"request_quota"`  // 每日请求次数限制 @author ygw
 	RateLimitRPM *int    `json:"rate_limit_rpm"` // 每分钟请求频率限制 @author ygw
 	Enabled      *bool   `json:"enabled"`
-	IsVip        *bool   `json:"is_vip"` // VIP用户标识 @author ygw
+	IsVip        *bool   `json:"is_vip"`   // VIP用户标识 @author ygw
+	ExpiresAt    *int64  `json:"expires_at"` // 过期时间（Unix时间戳）
 	Notes        *string `json:"notes"`
 }
 

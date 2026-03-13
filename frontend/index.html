@@ -48,6 +48,9 @@
             </div>
             <div class="header-actions">
                 <!-- 激活按钮（免费版显示） -->
+                <button class="btn btn--primary btn--header" @click="showLicenseModal = true" v-if="settingsData.isFreeEdition" data-tooltip="输入激活码解锁完整功能">
+                    <i class="ri-key-2-line"></i> 激活
+                </button>
                 <!-- 版本徽章 -->
                 <button :class="editionBadgeClass" @click="handleOpenVersionModal" data-tooltip="点击查看版本详情">
                     <i :class="editionIcon"></i>
@@ -196,6 +199,12 @@
                                 <i class="ri-device-line"></i> 一个激活码只能激活一台设备，第二台设备半价
                             </p>
                             <div class="version-card-upgrade" v-if="settingsData.edition !== 'ultra'">
+                                <button class="btn btn--primary btn--small" @click="showLicenseModal = true" v-if="settingsData.isFreeEdition">
+                                    <i class="ri-key-2-line"></i> 立即激活
+                                </button>
+                                <button class="btn btn--outline btn--small" @click="showLicenseModal = true" v-else>
+                                    <i class="ri-key-2-line"></i> 更换激活码
+                                </button>
                                 <button class="btn btn--outline btn--small" @click="handleOpenVersionModal">
                                     <i class="ri-rocket-line"></i> 查看升级方案
                                 </button>
@@ -799,6 +808,11 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                                 <th class="col-monthly-quota">月配额</th>
                                 <th class="col-request-quota">请求限制</th>
                                 <th class="col-rate-limit">频率限制</th>
+                                <th class="col-expires sortable" @click="handleUserSort('expires_at')" :class="{'sort-active': userSortField === 'expires_at'}">
+                                    过期时间
+                                    <i class="ri-arrow-up-s-line" v-if="userSortField === 'expires_at' && userSortOrder === 'asc'"></i>
+                                    <i class="ri-arrow-down-s-line" v-if="userSortField === 'expires_at' && userSortOrder === 'desc'"></i>
+                                </th>
                                 <th class="col-created sortable" @click="handleUserSort('created_at')" :class="{'sort-active': userSortField === 'created_at'}">
                                     创建时间
                                     <i class="ri-arrow-up-s-line" v-if="userSortField === 'created_at' && userSortOrder === 'asc'"></i>
@@ -846,6 +860,15 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                                 </td>
                                 <td class="col-rate-limit">
                                     <span class="quota-text">{{ user.rate_limit_rpm > 0 ? (user.rate_limit_rpm + '次/分') : '-' }}</span>
+                                </td>
+                                <td class="col-expires">
+                                    <span v-if="isUserExpired(user)" class="status-badge status-badge--error" title="用户已过期">
+                                        <i class="ri-error-warning-line"></i> 已过期
+                                    </span>
+                                    <span v-else-if="isUserExpiringSoon(user)" class="status-badge status-badge--warning" :title="formatExpiresAt(user.expires_at)">
+                                        <i class="ri-time-line"></i> {{ formatExpiresAt(user.expires_at) }}
+                                    </span>
+                                    <span v-else class="quota-text">{{ formatExpiresAt(user.expires_at) }}</span>
                                 </td>
                                 <td class="col-created">
                                     <span class="created-text">{{ formatCreatedTime(user.created_at) }}</span>
@@ -1003,6 +1026,21 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                                     <div class="custom-select-option" :class="{ 'is-selected': !logsFilters.accountID }" @click="logsFilters.accountID = ''; accountSelectOpen = false">所有账号</div>
                                     <div class="custom-select-option" v-for="account in accounts" :key="account.id" :class="{ 'is-selected': logsFilters.accountID === account.id }" @click="logsFilters.accountID = account.id; accountSelectOpen = false">
                                         {{ account.label || `#${getAccountShortId(account.id)}` }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px;">用户</label>
+                            <div class="custom-select" :class="{ 'is-open': userSelectOpen }">
+                                <div class="custom-select-trigger" @click="userSelectOpen = !userSelectOpen">
+                                    <span>{{ logsFilters.userID ? (users.find(u => u.id === logsFilters.userID)?.name || logsFilters.userID) : '所有用户' }}</span>
+                                    <i class="ri-arrow-down-s-line"></i>
+                                </div>
+                                <div class="custom-select-options" v-show="userSelectOpen">
+                                    <div class="custom-select-option" :class="{ 'is-selected': !logsFilters.userID }" @click="logsFilters.userID = ''; userSelectOpen = false">所有用户</div>
+                                    <div class="custom-select-option" v-for="user in users" :key="user.id" :class="{ 'is-selected': logsFilters.userID === user.id }" @click="logsFilters.userID = user.id; userSelectOpen = false">
+                                        {{ user.name }}
                                     </div>
                                 </div>
                             </div>
@@ -1314,6 +1352,86 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                             </tr>
                             <tr v-if="blockedIPs.length === 0">
                                 <td colspan="4" style="text-align: center; color: var(--color-text-secondary);">暂无封禁IP</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Tab 面板: 激活码/机器码黑名单管理 -->
+            <section class="tab-panel" :class="{'is-active': activeTab === 'licenses'}">
+                <div class="page-header">
+                    <h2 class="page-header-title">激活码/机器码黑名单</h2>
+                    <div class="page-header-actions">
+                        <button class="btn btn--primary" @click="handleLoadBlockedLicenses" :disabled="licensesLoading">
+                            <i class="btn-icon ri-refresh-line" :class="{'is-spinning': licensesLoading}"></i> 刷新
+                        </button>
+                        <button class="btn btn--danger" @click="openAddLicenseModal">
+                            <i class="ri-add-line"></i> 添加黑名单
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 筛选和统计栏 -->
+                <div style="margin-bottom: 15px; padding: 15px; background: var(--color-bg-elevated); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                        <!-- 左侧：Tab切换 -->
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn--sm" :class="licenseViewMode === 'all' ? 'btn--primary' : 'btn--secondary'" @click="licenseViewMode = 'all'">
+                                <i class="ri-list-check"></i> 全部 ({{ blockedLicenses.length }})
+                            </button>
+                            <button class="btn btn--sm" :class="licenseViewMode === 'machine_id' ? 'btn--primary' : 'btn--secondary'" @click="licenseViewMode = 'machine_id'">
+                                <i class="ri-computer-line"></i> 机器码 ({{ machineIdCount }})
+                            </button>
+                            <button class="btn btn--sm" :class="licenseViewMode === 'license_key' ? 'btn--primary' : 'btn--secondary'" @click="licenseViewMode = 'license_key'">
+                                <i class="ri-key-2-line"></i> 激活密钥 ({{ licenseKeyCount }})
+                            </button>
+                        </div>
+                        <!-- 右侧：说明 -->
+                        <div style="color: var(--color-text-secondary); font-size: 13px;">
+                            <i class="ri-information-line"></i> 用于拦截白嫖模式下的恶意用户
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 黑名单列表 -->
+                <div class="table-container" style="flex: 1; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead style="position: sticky; top: 0; background: var(--color-bg-elevated); z-index: 10;">
+                            <tr>
+                                <th style="width: 100px;">类型</th>
+                                <th>值</th>
+                                <th>封禁原因</th>
+                                <th style="width: 180px;">封禁时间</th>
+                                <th style="width: 100px; text-align: right;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="license in filteredBlockedLicenses" :key="license.id">
+                                <td>
+                                    <span class="badge" :class="license.type === 'machine_id' ? 'badge--info' : 'badge--warning'">
+                                        <i :class="getLicenseTypeIcon(license.type)"></i>
+                                        {{ getLicenseTypeName(license.type) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <code class="license-code" :title="license.value">{{ truncateLicenseValue(license.value, 40) }}</code>
+                                </td>
+                                <td>{{ license.reason || '-' }}</td>
+                                <td>{{ formatLicenseTime(license.created_at) }}</td>
+                                <td>
+                                    <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                        <button class="btn btn--small btn--success" @click="handleUnblockLicense(license)" data-tooltip="移除黑名单">
+                                            <i class="ri-delete-bin-line"></i> 移除
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredBlockedLicenses.length === 0">
+                                <td colspan="5" style="text-align: center; color: var(--color-text-secondary); padding: 40px;">
+                                    <i class="ri-shield-check-line" style="font-size: 48px; display: block; margin-bottom: 10px; opacity: 0.5;"></i>
+                                    暂无黑名单记录
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -2125,6 +2243,9 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button class="btn btn--secondary" @click="showLicenseModal = true; showVersionModal = false">
+                        <i class="ri-key-2-line"></i> 激活
+                    </button>
                     <button class="btn btn--primary" @click="closeVersionModal">
                         <i class="ri-check-line"></i> 我知道了
                     </button>
@@ -2181,6 +2302,65 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
             </div>
         </div>
 
+        <!-- ==================== 激活码输入弹窗 ==================== -->
+        <div class="modal-overlay" :class="{active: showLicenseModal}" @click.self="showLicenseModal = false">
+            <div class="modal license-modal">
+                <div class="modal-header">
+                    <h3><i class="ri-key-2-line"></i> 激活授权</h3>
+                    <button class="modal-close-btn" @click="showLicenseModal = false">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- 步骤1：机器码 -->
+                    <div class="license-step">
+                        <div class="license-step-header">
+                            <span class="license-step-num">1</span>
+                            <span class="license-step-title">复制机器码</span>
+                        </div>
+                        <div class="license-machine-id">
+                            <code class="license-code-display">{{ settingsData.machineId }}</code>
+                            <button class="btn btn--secondary btn--small" @click="copyMachineId">
+                                <i class="ri-file-copy-line"></i> 复制
+                            </button>
+                        </div>
+                        <p class="form-hint"><i class="ri-information-line"></i> 购买时需提供此机器码给卖家</p>
+                    </div>
+                    <!-- 步骤2：购买 -->
+                    <div class="license-step">
+                        <div class="license-step-header">
+                            <span class="license-step-num">2</span>
+                            <span class="license-step-title">获取激活码</span>
+                        </div>
+                        <div class="license-purchase-info" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                            <a href="https://pay.ldxp.cn/shop/XM3L94VA" target="_blank" style="color: var(--color-accent-primary); text-decoration: none; display: flex; align-items: center; gap: 6px;">
+                                <i class="ri-shopping-bag-line"></i>
+                                <span>点击购买激活码</span>
+                                <i class="ri-external-link-line" style="font-size: 12px;"></i>
+                            </a>
+                            <p class="form-hint" style="margin: 0;"><i class="ri-lightbulb-line"></i> 个人用户购买 Pro 版即可满足日常使用</p>
+                        </div>
+                    </div>
+                    <!-- 步骤3：输入激活码 -->
+                    <div class="license-step">
+                        <div class="license-step-header">
+                            <span class="license-step-num">3</span>
+                            <span class="license-step-title">输入激活码</span>
+                        </div>
+                        <textarea class="form-input license-textarea" v-model="licenseCode" rows="3" placeholder="将激活码完整粘贴到此处..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--secondary" @click="showLicenseModal = false">取消</button>
+                    <button class="btn btn--primary" @click="handleActivateLicense" :disabled="!licenseCode || licenseActivating">
+                        <i class="ri-check-line" v-if="!licenseActivating"></i>
+                        <i class="ri-loader-4-line ri-spin" v-else></i>
+                        {{ licenseActivating ? '激活中...' : '立即激活' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- ==================== 测试模式密码弹窗 ==================== -->
         <div class="modal-overlay modal-overlay--top" :class="{active: showTestPasswordModal}" @click.self="cancelTestPassword" @keydown.enter="confirmTestPassword" @keydown.esc="cancelTestPassword">
             <div class="modal license-modal" style="max-width: 400px;">
@@ -2216,6 +2396,81 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                     <button class="btn btn--primary" @click="confirmTestPassword" :disabled="!testPasswordInput">
                         <i class="ri-check-line"></i> 确认
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 激活码失效提示弹窗 ==================== -->
+        <div class="modal-overlay" :class="{active: showLicenseInvalidModal}">
+            <div class="modal license-invalid-modal">
+                <div class="modal-body">
+                    <div class="logout-modal-content">
+                        <div class="logout-icon-wrapper" style="background: rgba(239, 83, 80, 0.1);">
+                            <i class="ri-error-warning-line" style="color: var(--color-danger);"></i>
+                        </div>
+                        <div class="logout-text">
+                            <h3>激活码已失效</h3>
+                            <p>{{ settingsData.licenseError || '未知错误' }}</p>
+                        </div>
+                    </div>
+                    <div class="license-invalid-info">
+                        <div class="license-invalid-title">当前以免费模式运行，功能受限：</div>
+                        <ul class="license-invalid-list">
+                            <li><i class="ri-user-line"></i> 最多 1 个有效账号</li>
+                            <li><i class="ri-forbid-line"></i> 禁用账号导入/导出</li>
+                            <li><i class="ri-lock-line"></i> 部分管理功能不可用</li>
+                        </ul>
+                        <div class="license-invalid-contact">
+                            <i class="ri-customer-service-2-line"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--secondary" @click="dismissLicenseInvalidModal(false)">下次再说</button>
+                    <button class="btn btn--primary" @click="dismissLicenseInvalidModal(true)">
+                        <i class="ri-check-line"></i> 我知道了
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 免费版升级提示弹窗 ==================== -->
+        <div class="modal-overlay" :class="{active: showUpgradeModal}" @click.self="closeUpgradeModal">
+            <div class="modal upgrade-modal">
+                <div class="modal-header">
+                    <h3><i class="ri-rocket-line"></i> {{ upgradeModalTitle }}</h3>
+                    <button class="modal-close-btn" @click="closeUpgradeModal">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="upgrade-content">
+                        <div class="upgrade-icon">
+                            <i class="ri-vip-crown-2-fill"></i>
+                        </div>
+                        <div class="upgrade-description">
+                            <p>{{ upgradeModalDescription }}</p>
+                        </div>
+                        <div class="upgrade-features">
+                            <h4>付费版特权</h4>
+                            <ul>
+                                <li><i class="ri-check-line"></i> 无限请求次数 (免费版限200次)</li>
+                                <li><i class="ri-check-line"></i> 更多账号配额 (最高100个)</li>
+                                <li><i class="ri-check-line"></i> 账号导入/导出功能</li>
+                                <li><i class="ri-check-line"></i> 用户管理功能</li>
+                                <li><i class="ri-check-line"></i> 请求日志分析</li>
+                                <li><i class="ri-check-line"></i> IP 黑名单管理</li>
+                            </ul>
+                        </div>
+                        <div class="upgrade-purchase">
+                            <div class="purchase-info">
+                                <i class="ri-shopping-bag-line"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--secondary" @click="closeUpgradeModal">稍后再说</button>
                 </div>
             </div>
         </div>
@@ -2877,6 +3132,83 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
         </div>
 
         <!-- 添加黑名单弹窗 -->
+        <div class="modal-overlay" :class="{active: showAddLicenseModal}" @click.self="closeAddLicenseModal">
+            <div class="modal user-modal">
+                <div class="modal-header">
+                    <div class="modal-header-content">
+                        <i class="ri-forbid-line modal-header-icon" style="color: var(--color-danger);"></i>
+                        <h3>添加到黑名单</h3>
+                    </div>
+                    <button class="modal-close" @click="closeAddLicenseModal"><i class="ri-close-line"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="ri-price-tag-3-line"></i>
+                            类型
+                        </label>
+                        <div class="license-type-selector">
+                            <label class="license-type-option" :class="{'license-type-option--active': newBlockLicense.type === 'machine_id'}">
+                                <input type="radio" v-model="newBlockLicense.type" value="machine_id">
+                                <i class="ri-computer-line"></i>
+                                <span>机器码</span>
+                            </label>
+                            <label class="license-type-option" :class="{'license-type-option--active': newBlockLicense.type === 'license_key'}">
+                                <input type="radio" v-model="newBlockLicense.type" value="license_key">
+                                <i class="ri-key-2-line"></i>
+                                <span>激活密钥</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i :class="newBlockLicense.type === 'machine_id' ? 'ri-computer-line' : 'ri-key-2-line'"></i>
+                            {{ newBlockLicense.type === 'machine_id' ? '机器码' : '激活密钥' }}
+                        </label>
+                        <input type="text" class="form-input" v-model="newBlockLicense.value" :placeholder="newBlockLicense.type === 'machine_id' ? '输入要封禁的机器码' : '输入要封禁的激活密钥'">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="ri-file-text-line"></i>
+                            封禁原因（可选）
+                        </label>
+                        <input type="text" class="form-input" v-model="newBlockLicense.reason" placeholder="默认：检测到多个机器使用">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--secondary" @click="closeAddLicenseModal">取消</button>
+                    <button class="btn btn--danger" @click="handleBlockLicense" :disabled="!newBlockLicense.value.trim()">
+                        <i class="ri-forbid-line"></i> 添加到黑名单
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 移除黑名单确认弹窗 -->
+        <div class="modal-overlay" :class="{active: showUnblockLicenseModal}" @click.self="closeUnblockLicenseModal">
+            <div class="modal oauth-modal">
+                <div class="modal-body">
+                    <div class="oauth-modal-content">
+                        <div class="oauth-icon-wrapper" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); box-shadow: 0 8px 16px rgba(17, 153, 142, 0.3);">
+                            <i class="ri-delete-bin-line"></i>
+                        </div>
+                        <h3 class="oauth-title">确认移除黑名单</h3>
+                        <p class="oauth-description">确定要移除以下{{ unblockLicenseTarget?.type === 'machine_id' ? '机器码' : '激活密钥' }}吗？</p>
+                        <div class="license-value-display">
+                            <code>{{ unblockLicenseTarget?.value }}</code>
+                        </div>
+                        <p class="oauth-hint">移除后该{{ unblockLicenseTarget?.type === 'machine_id' ? '机器码' : '激活密钥' }}可以正常使用</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--secondary" @click="closeUnblockLicenseModal">取消</button>
+                    <button class="btn btn--success" @click="confirmUnblockLicense">
+                        <i class="ri-check-line"></i> 确认移除
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- IP配置编辑弹窗 -->
         <div class="modal-overlay" :class="{active: showIPConfigModal}" @click.self="closeIPConfigModal">
             <div class="modal user-modal" style="max-width: 420px;">
@@ -3120,6 +3452,35 @@ export ANTHROPIC_API_KEY=你的API密钥</code></pre>
                                     <span class="toggle-slider"></span>
                                 </div>
                             </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="ri-calendar-line"></i>
+                                过期日期（可选）
+                            </label>
+                            <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+                                <button type="button" class="btn btn--sm btn--secondary" @click="setExpiresAt(1)">
+                                    <i class="ri-time-line"></i> 1天
+                                </button>
+                                <button type="button" class="btn btn--sm btn--secondary" @click="setExpiresAt(3)">
+                                    <i class="ri-time-line"></i> 3天
+                                </button>
+                                <button type="button" class="btn btn--sm btn--secondary" @click="setExpiresAt(7)">
+                                    <i class="ri-time-line"></i> 7天
+                                </button>
+                                <button type="button" class="btn btn--sm btn--secondary" @click="setExpiresAt(14)">
+                                    <i class="ri-time-line"></i> 14天
+                                </button>
+                                <button type="button" class="btn btn--sm btn--secondary" @click="setExpiresAt(30)">
+                                    <i class="ri-time-line"></i> 30天
+                                </button>
+                                <button type="button" class="btn btn--sm btn--secondary" @click="clearExpiresAt()">
+                                    <i class="ri-close-line"></i> 清除
+                                </button>
+                            </div>
+                            <input type="datetime-local" class="form-input" v-model="createUserForm.expiresAt" placeholder="不选择则永不过期">
+                            <small class="form-hint">设置用户过期时间，过期后将无法使用。不选择则永不过期。时间按照中国时区计算。</small>
                         </div>
                     </div>
 

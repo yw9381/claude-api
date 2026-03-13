@@ -69,6 +69,10 @@ export const accountsMixin = {
             isResettingAccountStats: false,
             // 账号统计面板
             showAccountsStatsPanel: false,
+            // 免费版购买提示弹窗
+            showUpgradeModal: false,
+            upgradeModalTitle: '升级到付费版',
+            upgradeModalDescription: '解锁更多账号和完整功能',
             // 添加账号提示弹窗
             showAddAccountTipModal: false,
             // Token 导入相关
@@ -1196,11 +1200,26 @@ export const accountsMixin = {
             this.handleDeleteSuspendedAccounts();
         },
 
+        // 打开升级弹窗
+        handleShowUpgradeModal(title, description) {
+            this.upgradeModalTitle = title || '升级到付费版';
+            this.upgradeModalDescription = description || '解锁更多账号和完整功能';
+            this.showUpgradeModal = true;
+        },
+
+        // 关闭升级弹窗
+        closeUpgradeModal() {
+            this.showUpgradeModal = false;
+        },
+
         // OAuth相关
         async handleStartOAuth() {
-            // 检查账号配额
-            if (this.isAtQuotaLimit) {
-                showToast(this, `已达账号上限（${this.settingsData.maxAccounts}个），无法添加更多账号`, 'warning');
+            // 免费版检查：已达有效账号上限
+            if (this.settingsData.isFreeEdition && this.isAtQuotaLimit) {
+                this.handleShowUpgradeModal(
+                    '免费版账号已满',
+                    `免费版限制 ${this.settingsData.maxAccounts} 个有效账号和 200 次请求，请升级到付费版解锁更多账号和无限请求`
+                );
                 return;
             }
 
@@ -1399,6 +1418,14 @@ export const accountsMixin = {
 
         // 导入导出
         async handleExportAccounts() {
+            // 免费版禁用导出
+            if (this.settingsData.isFreeEdition) {
+                this.handleShowUpgradeModal(
+                    '免费版功能受限',
+                    '账号导出功能需要付费版，请升级解锁完整功能'
+                );
+                return;
+            }
 
             if (!this.accounts || this.accounts.length === 0) {
                 showToast(this, '没有账号可导出', 'warning');
@@ -1430,6 +1457,14 @@ export const accountsMixin = {
         },
 
         handleImportAccounts() {
+            // 免费版禁用导入
+            if (this.settingsData.isFreeEdition) {
+                this.handleShowUpgradeModal(
+                    '免费版功能受限',
+                    '账号导入功能需要付费版，请升级解锁完整功能'
+                );
+                return;
+            }
 
             // 检查账号配额限制
             if (this.isAtQuotaLimit) {
@@ -1622,6 +1657,14 @@ export const accountsMixin = {
 
         // 打开 Token 导入文件选择
         handleImportByToken() {
+            // 免费版禁用导入
+            if (this.settingsData.isFreeEdition) {
+                this.handleShowUpgradeModal(
+                    '免费版功能受限',
+                    'Token 导入功能需要付费版，请升级解锁完整功能'
+                );
+                return;
+            }
 
             // 检查账号配额限制
             if (this.isAtQuotaLimit) {

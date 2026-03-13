@@ -9,6 +9,7 @@ import { settingsMixin } from './settings.js';
 import { chatMixin } from './chat.js';
 import { logsMixin } from './logs.js';
 import { ipsMixin } from './ips.js';
+import { licensesMixin } from './licenses.js';
 import { serverLogsMixin } from './serverLogs.js';
 import { devtoolsMixin } from './devtools.js';
 
@@ -16,7 +17,7 @@ const { createApp } = Vue;
 
 createApp({
     // 混入所有功能模块
-    mixins: [accountsMixin, usersMixin, settingsMixin, chatMixin, logsMixin, ipsMixin, serverLogsMixin, devtoolsMixin],
+    mixins: [accountsMixin, usersMixin, settingsMixin, chatMixin, logsMixin, ipsMixin, licensesMixin, serverLogsMixin, devtoolsMixin],
 
     // ==================== 数据定义 ====================
     data() {
@@ -31,6 +32,7 @@ createApp({
                 { id: 'users', label: '用户管理', freeAllowed: false },
                 { id: 'logs', label: '请求日志', freeAllowed: false },
                 { id: 'ips', label: 'IP管理', freeAllowed: false },
+                { id: 'licenses', label: '黑名单', freeAllowed: true },  // 激活码/机器码黑名单 @author ygw
                 { id: 'settings', label: '系统配置', freeAllowed: true },
                 { id: 'serverLogs', label: '服务日志', freeAllowed: true },
                 { id: 'chat', label: 'Chat 会话', freeAllowed: true },
@@ -273,6 +275,9 @@ createApp({
                     await this.handleLoadUsers();
                     break;
                 case 'logs':
+                    // 日志筛选需要账号和用户列表
+                    await this.handleLoadAccounts();
+                    await this.handleLoadUsers();
                     await this.handleLoadLogs();
                     if (this.showLogsStatsPanel) {
                         await this.handleLoadLogsStats();
@@ -280,6 +285,9 @@ createApp({
                     break;
                 case 'ips':
                     await this.handleLoadAllIPs();
+                    break;
+                case 'licenses':
+                    await this.handleLoadBlockedLicenses();
                     break;
                 case 'settings':
                     // settings 已在初始化时加载

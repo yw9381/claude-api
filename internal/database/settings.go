@@ -17,7 +17,7 @@ func (db *DB) GetSettings(ctx context.Context) (*models.Settings, error) {
 		AdminPassword:           "admin",
 		DebugLog:                false,
 		EnableRequestLog:        false,
-		LogRetentionDays:        7,
+		LogRetentionDays:        30,
 		EnableIPRateLimit:       false,
 		IPRateLimitWindow:       1,
 		IPRateLimitMax:          100,

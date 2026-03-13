@@ -9,13 +9,16 @@ export const logsMixin = {
             logs: [],
             logsTotal: 0,
             logsStats: null,
+            userStats: [],
             showLogsStatsPanel: false,
+            showUserStatsPanel: false,
             logsLoading: false,
             logsFilters: {
                 startTime: '',
                 endTime: '',
                 clientIP: '',
                 accountID: '',
+                userID: '',
                 endpointType: '',
                 isSuccess: ''
             },
@@ -30,6 +33,7 @@ export const logsMixin = {
             showCleanupLogsModal: false,
             // 下拉选择器状态
             accountSelectOpen: false,
+            userSelectOpen: false,
             endpointSelectOpen: false,
             statusSelectOpen: false
         };
@@ -77,6 +81,7 @@ export const logsMixin = {
                 }
                 if (this.logsFilters.clientIP) params.append('client_ip', this.logsFilters.clientIP);
                 if (this.logsFilters.accountID) params.append('account_id', this.logsFilters.accountID);
+                if (this.logsFilters.userID) params.append('user_id', this.logsFilters.userID);
                 if (this.logsFilters.endpointType) params.append('endpoint_type', this.logsFilters.endpointType);
                 if (this.logsFilters.isSuccess !== '') params.append('is_success', this.logsFilters.isSuccess);
 
@@ -108,6 +113,7 @@ export const logsMixin = {
                 }
                 if (this.logsFilters.clientIP) params.append('client_ip', this.logsFilters.clientIP);
                 if (this.logsFilters.accountID) params.append('account_id', this.logsFilters.accountID);
+                if (this.logsFilters.userID) params.append('user_id', this.logsFilters.userID);
                 if (this.logsFilters.endpointType) params.append('endpoint_type', this.logsFilters.endpointType);
                 if (this.logsFilters.isSuccess !== '') params.append('is_success', this.logsFilters.isSuccess);
 
@@ -127,6 +133,42 @@ export const logsMixin = {
             }
             this.showLogsStatsPanel = willOpen;
             localStorage.setItem('showLogsStatsPanel', willOpen);
+        },
+
+        async handleToggleUserStatsPanel() {
+            const willOpen = !this.showUserStatsPanel;
+            if (willOpen) {
+                await this.handleLoadUserStats();
+            }
+            this.showUserStatsPanel = willOpen;
+            localStorage.setItem('showUserStatsPanel', willOpen);
+        },
+
+        async handleLoadUserStats() {
+            try {
+                const params = new URLSearchParams();
+                // 使用与日志列表相同的筛选条件
+                if (this.logsFilters.startTime) {
+                    const startISO = new Date(this.logsFilters.startTime).toISOString();
+                    params.append('start_time', startISO);
+                }
+                if (this.logsFilters.endTime) {
+                    const endISO = new Date(this.logsFilters.endTime).toISOString();
+                    params.append('end_time', endISO);
+                }
+                if (this.logsFilters.clientIP) params.append('client_ip', this.logsFilters.clientIP);
+                if (this.logsFilters.accountID) params.append('account_id', this.logsFilters.accountID);
+                if (this.logsFilters.endpointType) params.append('endpoint_type', this.logsFilters.endpointType);
+                if (this.logsFilters.isSuccess !== '') params.append('is_success', this.logsFilters.isSuccess);
+
+                const response = await fetch(`/v2/logs/user-stats?${params}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('adminPassword')}` }
+                });
+                const data = await response.json();
+                this.userStats = data.user_stats || [];
+            } catch (error) {
+                console.error('加载用户统计失败:', error);
+            }
         },
 
         async handleCleanupLogs() {
@@ -230,6 +272,9 @@ export const logsMixin = {
                 case '7d':
                     start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                     break;
+                case '30d':
+                    start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    break;
                 default:
                     start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             }
@@ -238,6 +283,9 @@ export const logsMixin = {
             this.logsFilters.endTime = end;
             this.handleLoadLogs(true); // 重置到第一页
             this.handleLoadLogsStats();
+            if (this.showUserStatsPanel) {
+                this.handleLoadUserStats();
+            }
         },
 
         /**
@@ -255,11 +303,15 @@ export const logsMixin = {
                 endTime: '',
                 clientIP: '',
                 accountID: '',
+                userID: '',
                 endpointType: '',
                 isSuccess: ''
             };
             this.handleLoadLogs(true); // 重置到第一页
             this.handleLoadLogsStats();
+            if (this.showUserStatsPanel) {
+                this.handleLoadUserStats();
+            }
         },
 
         handleLogsNextPage() {

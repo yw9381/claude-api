@@ -116,6 +116,10 @@ func (db *DB) UpdateUser(ctx context.Context, id string, updates *models.UserUpd
 	if updates.IsVip != nil {
 		updateMap["is_vip"] = *updates.IsVip
 	}
+	// 过期时间 @author ygw
+	if updates.ExpiresAt != nil {
+		updateMap["expires_at"] = *updates.ExpiresAt
+	}
 
 	result := db.gorm.WithContext(ctx).Model(&models.User{}).Where("id = ?", id).Updates(updateMap)
 	if result.Error != nil {

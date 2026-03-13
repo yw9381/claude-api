@@ -69,6 +69,22 @@ type AccountStat struct {
 	TotalTokens  int64  `json:"total_tokens"`
 }
 
+// UserStat 用户统计
+type UserStat struct {
+	UserID           string  `json:"user_id"`
+	UserName         string  `json:"user_name"`
+	IsVip            bool    `json:"is_vip"`
+	RequestCount     int64   `json:"request_count"`
+	SuccessCount     int64   `json:"success_count"`
+	FailedCount      int64   `json:"failed_count"`
+	TotalInputTokens int64   `json:"total_input_tokens"`
+	TotalOutputTokens int64  `json:"total_output_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	TotalCostUSD     float64 `json:"total_cost_usd"`
+	AvgDurationMs    float64 `json:"avg_duration_ms"`
+	LastRequestTime  string  `json:"last_request_time"`
+}
+
 // BlockedIP 被封禁的IP
 type BlockedIP struct {
 	IP        string  `gorm:"primaryKey;size:45" json:"ip"`
@@ -129,6 +145,7 @@ type LogFilters struct {
 	EndTime      *string `json:"end_time"`
 	ClientIP     *string `json:"client_ip"`
 	AccountID    *string `json:"account_id"`
+	UserID       *string `json:"user_id"`
 	EndpointType *string `json:"endpoint_type"`
 	IsSuccess    *bool   `json:"is_success"`
 }
