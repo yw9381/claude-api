@@ -1833,11 +1833,11 @@ func (s *Server) handleGetModels(c *gin.Context) {
 	logger.Info("获取模型列表 - 请求来源: %s", c.ClientIP())
 
 	modelList := []gin.H{
-		{"id": "claude-opus-4-6", "object": "model", "owned_by": "kiro"},
-		{"id": "claude-opus-4-6-thinking", "object": "model", "owned_by": "kiro"},
-		{"id": "claude-sonnet-4-6", "object": "model", "owned_by": "kiro"},
-		{"id": "claude-sonnet-4-6-thinking", "object": "model", "owned_by": "kiro"},
-		{"id": "claude-haiku-4-6", "object": "model", "owned_by": "kiro"},
+		{"id": "claude-opus-4-5", "object": "model", "owned_by": "kiro"},
+		{"id": "claude-opus-4-5-thinking", "object": "model", "owned_by": "kiro"},
+		{"id": "claude-sonnet-4-5", "object": "model", "owned_by": "kiro"},
+		{"id": "claude-sonnet-4-5-thinking", "object": "model", "owned_by": "kiro"},
+		{"id": "claude-haiku-4-5", "object": "model", "owned_by": "kiro"},
 	}
 
 	c.JSON(200, gin.H{
